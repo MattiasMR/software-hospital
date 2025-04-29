@@ -1,0 +1,50 @@
+Cada diseño de solución tiene su PROPIA base de datos
+
+Hay que leer las bases del proyecto DE MEMORIA
+
+# Actividad 004
+● Siguiendo los pasos de la metodología Cascada o lineal, confeccione los artefactos de
+las siguientes etapas:
+● Análisis situación actual
+● Estudio de factibilidad
+● Alcance del proyecto
+● Planificación Proyecto
+● Captura de requisitos
+● Diseño solución
+
+● El documento debe entregarse el lunes 31 de marzo del 2025 a las 23:59.
+● La retroalimentación será el día Jueves 03 de abril, un representante de cada equipo
+debe agendar reunión de 15 minutos.
+● No es obligatorio la asistencia de todo el equipo.
+● El agendamiento es a partir de las 10:00 am.
+
+o El hospital necesita una manera efectiva de gestionar el tiempo de uso de los
+Box de atención médica, de tal manera que no solo se pueda coordinar su
+utilización, sino que también obtener estadísticas relevantes.
+o Se necesita un sistema que permita resolver el problema considerando las
+diversas situaciones conexas al problema.
+
+El contenido del informe debe contener:
+ Portada: Nombre del proyecto, nombres integrantes, nombre profesor guía, fecha entrega, logotipo
+UDD, nombre de la facultad.
+ Índices: Contenidos, Imágenes y Tablas.
+ Abstract: en español e ingles
+ Introducción
+Cuerpo del informe:
+• Planificación
+• Factibilidad técnica y económica
+• Requisitos de usuario
+• Diseño bases de datos
+• Diseño arquitectura solución
+• Plan de pruebas
+• Análisis y evaluación de algoritmos
+ Conclusiones
+ Bibliografía
+
+
+• Se descontará puntaje por:
+o Faltas ortográficas
+o Faltas gramaticales
+o Fallas argumentales o lógicas en el texto
+o Abuso de herramientas de asistencia inteligentes
+o No utilización o uso incorrecto de APA para la bibliografía y las citas 
