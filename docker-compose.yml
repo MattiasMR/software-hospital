@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:8.0.24
+    environment:
+      MYSQL_DATABASE: hospital
+      MYSQL_USER: user
+      MYSQL_PASSWORD: pass
+      MYSQL_ROOT_PASSWORD: rootpass
+    ports: ['3306:3306']
+  backend:
+    build: ./src/backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./src/backend:/app
+    ports: ['8000:8000']
+    depends_on:
+      - db
+  frontend:
+    build: ./src/frontend
+    command: npm run dev -- --host
+    volumes:
+      - ./src/frontend:/app
+    ports: ['5173:5173']
+    depends_on:
+      - backend
