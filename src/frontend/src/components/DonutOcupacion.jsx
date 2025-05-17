@@ -8,10 +8,11 @@ export default function DonutOcupacion({ porcentaje }) {
 
   return (
     <div className="w-40 flex flex-col items-center">
-      <div data-tooltip-id={tooltipId.current}
-           data-tooltip-content={
-            `Ocupado: ${safePorcentaje}%\nLibre: ${100 - safePorcentaje}%`
-           }
+      <div
+        data-tooltip-id={tooltipId.current}
+        data-tooltip-content={
+          `Ocupado: ${safePorcentaje}%\nLibre: ${100 - safePorcentaje}%`
+        }
       >
         <div className="w-40 flex flex-col items-center relative">
           <div className="relative" style={{ width: 130, height: 130 }}>
@@ -36,7 +37,7 @@ export default function DonutOcupacion({ porcentaje }) {
               segmentsStyle={{ cursor: "pointer" }}
             />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none"
-                style={{ fontSize: "1.4em", fontWeight: "bold", color: "#333" }}>
+              style={{ fontSize: "1.4em", fontWeight: "bold", color: "#333" }}>
               {safePorcentaje}%
             </div>
           </div>
@@ -45,7 +46,6 @@ export default function DonutOcupacion({ porcentaje }) {
             PO (porcentaje ocupación)
           </span>
         </div>
-
       </div>
       <Tooltip id={tooltipId.current} />
     </div>

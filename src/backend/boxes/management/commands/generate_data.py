@@ -1,48 +1,57 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from boxes.models import (
-    Box, TipoBox, DisponibilidadBox, Especialidad, Pasillo,
-    Medico, EstadoConsulta, Jornada, Consulta
+    Box, Especialidad, Pasillo, Medico, EstadoConsulta, Jornada, Consulta,
+    DisponibilidadBox, BoxEspecialidad
 )
 from datetime import datetime, timedelta, time
 import random
 
 class Command(BaseCommand):
-    help = "Genera datos de prueba: catálogos, médicos, boxes, y consultas para varios días."
+    help = "Genera datos de prueba realistas con restricciones por médico y box"
 
     def handle(self, *args, **options):
-        self.stdout.write("⚠️  Esto eliminará todos los datos previos (Boxes, Médicos, Consultas, etc.)")
-        confirm = input("¿Seguro que quieres continuar? (sí/no): ")
-        if confirm.lower() not in ("sí", "si", "yes", "y"):
-            self.stdout.write("Cancelado.")
-            return
-
-        # 1. Elimina todos los datos relevantes (orden seguro)
+        self.stdout.write("⚠️  Esto eliminará todos los datos previos.")
         Consulta.objects.all().delete()
+        BoxEspecialidad.objects.all().delete()
         Box.objects.all().delete()
         Medico.objects.all().delete()
         Pasillo.objects.all().delete()
-        TipoBox.objects.all().delete()
         DisponibilidadBox.objects.all().delete()
         Especialidad.objects.all().delete()
         Jornada.objects.all().delete()
         EstadoConsulta.objects.all().delete()
-
-        # 2. Catálogos base
-        tipos = [TipoBox.objects.create(tipoBox=nombre) for nombre in ['General', 'Especial']]
-        disponibilidades = [DisponibilidadBox.objects.create(disponibilidad=n) for n in ['Libre', 'Ocupado', 'Inhabilitado']]
-        especialidades = [Especialidad.objects.create(nombreEspecialidad=n) for n in ['Cardiología', 'Ginecología', 'Pediatría', 'Traumatología']]
-        jornadas = [Jornada.objects.create(jornadaInicio=ini, jornadaFin=fin) for ini, fin in [
-            ("08:00", "12:00"), ("12:00", "16:00"), ("16:00", "20:00")]]
-        estados = [
-            EstadoConsulta.objects.create(estadoConsulta=n)
-            for n in ['Ocupado', 'Libre', 'Inhabilitado', 'Pendiente', 'Confirmada', 'Cancelada']
+        self.stdout.write("🔄️  Generando datos.")
+        # Catálogos base
+        disp_hab = DisponibilidadBox.objects.create(disponibilidad='Habilitado')
+        disp_inh = DisponibilidadBox.objects.create(disponibilidad='Inhabilitado')
+        especialidades = [Especialidad.objects.create(nombreEspecialidad=n) for n in [
+            'Cardiología', 'Ginecología', 'Pediatría', 'Traumatología']]
+        jornadas = [
+            Jornada.objects.create(jornadaInicio=time(8,0), jornadaFin=time(14,0)),
+            Jornada.objects.create(jornadaInicio=time(14,0), jornadaFin=time(22,0)),
         ]
+        estados = {
+            "Pendiente": EstadoConsulta.objects.create(estadoConsulta="Pendiente"),
+            "Cancelada": EstadoConsulta.objects.create(estadoConsulta="Cancelada"),
+            "Completada": EstadoConsulta.objects.create(estadoConsulta="Completada"),
+        }
 
-        # 3. Pasillos
-        pasillos = [Pasillo.objects.create(nombrePasillo=f"Pasillo {chr(65+i)}") for i in range(4)]  # Pasillo A-D
-
-        # 4. Médicos
+        pasillos = [Pasillo.objects.create(nombrePasillo=f"Pasillo {chr(65+i)}") for i in range(4)]
+        boxes = []
+        for pasillo in pasillos:
+            for i in range(8):
+                disponibilidad = random.choices([disp_hab, disp_inh], weights=[0.85, 0.15])[0]
+                box = Box.objects.create(
+                    pasillo=pasillo,
+                    disponibilidadBox=disponibilidad,
+                )
+                box_esps = random.sample(especialidades, k=random.randint(1, 2))
+                box.especialidades.set(box_esps)
+                boxes.append(box)
+        habilitados = [b for b in boxes if b.disponibilidadBox.disponibilidad == "Habilitado"] # debug
+        print("Boxes habilitados:", len(habilitados)) # debug
+        print("Boxes inhabilitados:", len(boxes) - len(habilitados)) # debug
         nombres = [
             "Fernanda Soto", "Javier Sánchez", "Josefa Rojas", "Camila Morales", "María González",
             "Carlos Muñoz", "Sofía Fernández", "Diego Ramírez", "Alejandra Ruiz", "Andrés Castro"
@@ -58,39 +67,52 @@ class Command(BaseCommand):
             )
             medicos.append(medico)
 
-        # 5. Boxes (6 por pasillo)
-        boxes = []
-        for pasillo in pasillos:
-            for i in range(6):
-                dispo = random.choice(disponibilidades)
-                box = Box.objects.create(
-                    tipoBox=random.choice(tipos),
-                    disponibilidadBox=dispo,
-                    pasillo=pasillo,
-                )
-                # Relacionar con algunas especialidades
-                box.especialidades.set(random.sample(especialidades, k=random.randint(1, len(especialidades))))
-                boxes.append((box, dispo.disponibilidad))  # Guardamos disponibilidad para el siguiente paso
-
-        # 6. Consultas: Para N días, todos los boxes habilitados, franjas de 1h, médicos rotando
         N_DIAS = 7
-        horas = [(8, 9), (9, 10), (10, 11), (11, 12), (12, 13), (13, 14), (14, 15), (15, 16), (16, 17), (17, 18)]
         hoy = timezone.localdate()
         for day in range(N_DIAS):
             fecha = hoy + timedelta(days=day)
-            for box, dispo in boxes:
-                # Si el box está inhabilitado, no generar consultas ni asignar médicos
-                if dispo == "Inhabilitado":
+            for box in boxes:
+                if box.disponibilidadBox.disponibilidad == 'Inhabilitado':
                     continue
-                for h_ini, h_fin in horas:
-                    inicio = datetime.combine(fecha, time(h_ini, 0))
-                    fin = datetime.combine(fecha, time(h_fin, 0))
-                    estado = random.choice([e for e in estados if e.estadoConsulta in ["Ocupado", "Libre"]])
-                    medico = random.choice(medicos) if estado.estadoConsulta == "Ocupado" else None
-                    Consulta.objects.create(
-                        box=box,
-                        medico=medico,
-                        estadoConsulta=estado,
-                        fechaHoraInicio=inicio,
-                        fechaHoraFin=fin
-                    )
+                box_esps = list(box.especialidades.all())
+                consultas_box_medico = {}  # (medico_id) -> [horas asignadas]
+
+                for h in range(8, 22):
+                    hora_inicio = time(h, 0)
+                    hora_fin = time(h+1, 0)
+                    # Médicos con especialidad compatible y jornada activa en esa hora
+                    medicos_validos = [
+                        m for m in medicos
+                        if m.especialidad in box_esps
+                        and m.jornada.jornadaInicio <= hora_inicio
+                        and m.jornada.jornadaFin >= hora_fin
+                    ]
+                    random.shuffle(medicos_validos)
+                    for medico in medicos_validos:
+                        lista = consultas_box_medico.setdefault(medico.idMedico, [])
+                        # Limita a 3 consultas totales y no más de 2 seguidas
+                        if len(lista) >= 3:
+                            continue
+                        if len(lista) >= 2 and h-1 in lista and h-2 in lista:
+                            continue  # Ya tiene 2 consecutivas previas
+                        # 30% probabilidad de consulta
+                        if (random.random() < 0.8 and len(Consulta.objects.filter(box=box)) < 5) or (random.random() < 0.4 and len(Consulta.objects.filter(box=box)) < 14):
+                            inicio_dt = timezone.make_aware(datetime.combine(fecha, hora_inicio))
+                            fin_dt = timezone.make_aware(datetime.combine(fecha, hora_fin))
+                            # Estado
+                            if random.random() < 0.3:
+                                estado = estados["Pendiente"]
+                            elif random.random() < 0.1:
+                                estado = estados["Cancelada"]
+                            else:
+                                estado = estados["Completada"]
+                            Consulta.objects.create(
+                                box=box,
+                                medico=medico,
+                                estadoConsulta=estado,
+                                fechaHoraInicio=inicio_dt,
+                                fechaHoraFin=fin_dt
+                            )
+                            lista.append(h)
+                            break  # Solo un médico por franja
+        self.stdout.write(self.style.SUCCESS("✅ ¡Datos de prueba generados correctamente con restricciones!"))

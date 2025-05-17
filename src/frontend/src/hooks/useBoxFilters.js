@@ -1,37 +1,43 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 
-// Recibe array de boxes, retorna filtros, setters y la lista filtrada
-export default function useBoxFilters(boxes) {
-  const [filters, setFilters] = useState({
-    status:       "ALL",
-    box:          "ALL",
-    po:           "ALL",
-    pasillo:      "ALL",
-    medico:       "ALL",
-    especialidad: "ALL",
-  });
+/**
+ * @param {Array}  boxes   – array proveniente del SSE / backend
+ * @param {Object} filters – { disponibilidad, box, po, pasillo, medico }
+ */
 
-  // Filtrado reactivo y eficiente
+export default function useBoxFilters(boxes, filters) {
   const filteredBoxes = useMemo(() => {
-    return boxes.filter(box => {
-      if (filters.status !== "ALL" && box.disponibilidad !== filters.status)
+    return boxes.filter((box) => {
+      // Disponibilidad: Libre | Ocupado | Inhabilitado
+      if (
+        filters.disponibilidad !== "ALL" &&
+        box.disponibilidad !== filters.disponibilidad
+      )
         return false;
-      if (filters.box !== "ALL" && String(box.numeroBox ?? box.idBox) !== String(filters.box))
+
+      // Box (id numérico)
+      if (filters.box !== "ALL" && String(box.idBox) !== String(filters.box))
         return false;
+
+      // Porcentaje de ocupación
       if (filters.po !== "ALL") {
         const po = box.porcentajeOcupacion ?? 0;
-        if (filters.po === "0-50"      && !(po >= 0   && po < 50))  return false;
-        if (filters.po === "50-80"     && !(po >= 50  && po < 80))  return false;
-        if (filters.po === "80-100"    && !(po >= 80  && po <= 100)) return false;
+        if (filters.po === "0-50" && !(po >= 0 && po < 50)) return false;
+        if (filters.po === "50-80" && !(po >= 50 && po < 80)) return false;
+        if (filters.po === "80-100" && !(po >= 80 && po <= 100)) return false;
       }
+
+      // Pasillo
       if (filters.pasillo !== "ALL" && box.pasillo !== filters.pasillo)
         return false;
+
+      // Médico asignado
       if (filters.medico !== "ALL" && box.medicoAsignado !== filters.medico)
         return false;
-      // Aquí podrías añadir más reglas si agregas campos (especialidad, etc)
+
       return true;
     });
   }, [boxes, filters]);
 
-  return { filters, setFilters, filteredBoxes };
+  return { filteredBoxes };
 }

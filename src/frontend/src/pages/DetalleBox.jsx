@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import HeaderTop from "../components/HeaderTop";
@@ -11,10 +11,13 @@ import "react-datepicker/dist/react-datepicker.css";
 export default function DetalleBox() {
   const { idBox } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const dateFromQuery = queryParams.get("date");
   const [box, setBox] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [date, setDate] = useState(new Date());
+  const [date, setDate] = useState(dateFromQuery ? new Date(dateFromQuery) : new Date());
 
   useEffect(() => {
     setLoading(true);
@@ -75,14 +78,8 @@ export default function DetalleBox() {
                   <div className="flex flex-wrap items-center mb-6">
                     <div className="flex-1 min-w-[210px]">
                       <h1 className="text-2xl font-bold mb-2">
-                        Box {box.numeroBox}
+                        Box {box.idBox}
                       </h1>
-                      <p>
-                        <b>Tipo:</b> {box.tipoBox}
-                      </p>
-                      <p>
-                        <b>Disponibilidad:</b> {box.disponibilidad}
-                      </p>
                       <p>
                         <b>Pasillo:</b> {box.pasillo}
                       </p>
@@ -98,18 +95,28 @@ export default function DetalleBox() {
                         <th className="px-3 py-1 text-left">Inicio</th>
                         <th className="px-3 py-1 text-left">Fin</th>
                         <th className="px-3 py-1 text-left">Médico</th>
+                        <th className="px-3 py-1 text-left">Especialidad</th>
                         <th className="px-3 py-1 text-left">Estado</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {box.franjas.map((f, i) => (
-                        <tr key={i} className="border-b">
-                          <td className="px-3 py-1">{f.inicio}</td>
-                          <td className="px-3 py-1">{f.fin}</td>
-                          <td className="px-3 py-1">{f.medico || "—"}</td>
-                          <td className="px-3 py-1">{f.estado}</td>
+                      {box.franjas.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="text-center text-gray-500 py-4">
+                            No hay franjas para este día.
+                          </td>
                         </tr>
-                      ))}
+                      ) : (
+                        box.franjas.map((f, i) => (
+                          <tr key={i}>
+                            <td>{f.inicio}</td>
+                            <td>{f.fin}</td>
+                            <td>{f.medico}</td>
+                            <td>{f.especialidad}</td>
+                            <td>{f.estado}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

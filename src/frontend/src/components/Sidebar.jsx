@@ -17,11 +17,11 @@ const icons = [
   { icon: Cog6ToothIcon },
 ];
 
-export default function Sidebar() {
+export default function Sidebar( {className = "" }) {
   const { pathname } = useLocation();
 
   return (
-    <aside className="bg-white w-16 flex flex-col items-center gap-4 py-4 shadow">
+    <aside className={`bg-white flex flex-col items-center gap-4 shadow ${className}`}>
       {icons.map(({ icon: Icon, to }, i) =>
         to ? (
           <Link key={i} to={to}>

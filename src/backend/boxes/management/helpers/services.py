@@ -1,103 +1,104 @@
-from ...models import Box, Consulta, Especialidad
+from datetime import time, datetime
 from django.utils import timezone
+from ...models import Box, Medico, Consulta
 
-from datetime import datetime, timedelta
-from collections import defaultdict
+HORAS_FRANJAS = range(8, 22)  # 8:00 a 22:00
+OCCUPIED_STATES = {"Completada", "Pendiente", "Confirmada"}
+
+def get_box_franjas(box, fecha):
+    """Devuelve la lista de franjas horarias y su estado ('Ocupado', 'Libre', etc.) para ese box y día"""
+    consultas = box.consultas.filter(fechaHoraInicio__date=fecha)
+    franjas = []
+
+    if box.disponibilidadBox.disponibilidad == "Inhabilitado":
+        for h in HORAS_FRANJAS:
+            franjas.append({
+                "inicio": f"{h:02d}:00",
+                "fin": f"{h+1:02d}:00",
+                "medico": "—",
+                "especialidad": "—",
+                "estado": "Inhabilitado",
+            })
+        return franjas
+
+    for h in HORAS_FRANJAS:
+        ini = time(h, 0)
+        fin = time(h+1, 0)
+        ini_dt = datetime.combine(fecha, ini)
+        fin_dt = datetime.combine(fecha, fin)
+
+        # Asegurarse de que las fechas sean aware
+        ini_dt = timezone.make_aware(ini_dt, timezone.get_current_timezone())
+        fin_dt = timezone.make_aware(fin_dt, timezone.get_current_timezone())
+
+        consulta_encontrada = None
+        for c in consultas:
+            # Asegúrate de que las consultas también sean aware
+            inicio_c = c.fechaHoraInicio if c.fechaHoraInicio.tzinfo else timezone.make_aware(c.fechaHoraInicio)
+            fin_c = c.fechaHoraFin if c.fechaHoraFin.tzinfo else timezone.make_aware(c.fechaHoraFin)
+            
+            # Realiza la comparación ahora con fechas aware
+            if inicio_c < fin_dt and fin_c > ini_dt:
+                consulta_encontrada = c
+                break
+
+        if consulta_encontrada:
+            franjas.append({
+                "inicio": f"{ini:%H:%M}",
+                "fin": f"{fin:%H:%M}",
+                "medico": consulta_encontrada.medico.nombreCompleto if consulta_encontrada.medico else "—",
+                "especialidad": consulta_encontrada.medico.especialidad.nombreEspecialidad if consulta_encontrada.medico else "—",
+                "estado": consulta_encontrada.estadoConsulta.estadoConsulta,
+            })
+        else:
+            franjas.append({
+                "inicio": f"{ini:%H:%M}",
+                "fin": f"{fin:%H:%M}",
+                "medico": "—",
+                "especialidad": "—",
+                "estado": "Libre",
+            })
+    return franjas
+
+def calcular_porcentaje_ocupacion(franjas):
+    total = len([f for f in franjas if f["estado"] != "Inhabilitado"])
+    EXCLUIR = ("Libre", "Inhabilitado", "Cancelada")
+    ocupadas = sum(1 for f in franjas if f["estado"] not in EXCLUIR)
+
+    return int((ocupadas / total) * 100) if total else 0
 
 def get_boxes_with_kpis(target_date=None):
-    """
-    Devuelve una lista de diccionarios con el estado de cada box,
-    el médico asignado en la hora actual, y el porcentaje de ocupación diaria.
-    """
-    if target_date is None:
-        now = timezone.localtime()
-        target_date = now.date()
-    else:
-        now = timezone.localtime()
-    
-    boxes = (
-        Box.objects
-        .select_related('tipoBox', 'disponibilidadBox', 'pasillo')
-        .prefetch_related('consultas__medico', 'consultas__estadoConsulta')
-        .all()
-    )
-
+    """Lista de todos los boxes con su ocupación y estado en el día seleccionado"""
+    if not target_date:
+        target_date = timezone.localdate()
     results = []
-    for box in boxes:
-        consultas = box.consultas.filter(
-            fechaHoraInicio__date=target_date
-        )
-        total_consultas = consultas.count()
-        ocupadas = consultas.filter(estadoConsulta__estadoConsulta='Ocupado').count()
-        porcentaje_ocupacion = int((ocupadas / total_consultas) * 100) if total_consultas else 0
-
+    for box in Box.objects.select_related("disponibilidadBox", "pasillo").all():
+        franjas = get_box_franjas(box, target_date)
+        porcentaje_ocupacion = calcular_porcentaje_ocupacion(franjas)
         
-        consulta_actual = consultas.filter(
-            fechaHoraInicio__lte=now,
-            fechaHoraFin__gte=now,
-            estadoConsulta__estadoConsulta='Ocupado'
-        ).select_related('medico').first()
-        medico_asignado = consulta_actual.medico.nombreCompleto if consulta_actual else None
-
-        # Puedes agregar más KPIs aquí si los necesitas
-
+        now = timezone.localtime()
+        hora_actual = now.hour - 4  # Ajustar la hora a UTC-4
+        franja_actual = next(
+            (
+                f for f in franjas
+                if (
+                    isinstance(f["inicio"], str) and f["inicio"] != "--" and
+                    int(f["inicio"][:2]) <= hora_actual < int(f["fin"][:2])
+                )
+            ),
+            None
+        )
+        disponibilidad = (
+                "Ocupado" if franja_actual["estado"] in OCCUPIED_STATES
+                else franja_actual["estado"]          # Libre o Inhabilitado
+            )
+        medico_asignado = franja_actual["medico"] if franja_actual and franja_actual["medico"] != "—" else None
         results.append({
             "idBox": box.idBox,
-            "numeroBox": getattr(box, "numeroBox", box.idBox),
-            "tipoBox": box.tipoBox.tipoBox,
-            "disponibilidad": box.disponibilidadBox.disponibilidad,
+            "numeroBox": box.idBox,
             "pasillo": box.pasillo.nombrePasillo,
+            "disponibilidad": disponibilidad,
             "medicoAsignado": medico_asignado,
             "porcentajeOcupacion": porcentaje_ocupacion,
         })
     return results
-
-def get_reportes_kpis(date_from=None, date_to=None, especialidad=None):
-    """
-    Calcula KPIs para los boxes en el rango de fechas dado.
-    Devuelve: % ocupación global, tiempos muertos por box, uso por especialidad.
-    """
-    
-    # Parse fechas o usa el día actual por defecto
-    today = timezone.localdate()
-    if not date_from:
-        date_from = today
-    if not date_to:
-        date_to = today
-
-    consultas = Consulta.objects.filter(
-        fechaHoraInicio__date__gte=date_from,
-        fechaHoraInicio__date__lte=date_to
-    )
-    if especialidad:
-        consultas = consultas.filter(medico__especialidad__nombreEspecialidad=especialidad)
-
-    total_consultas = consultas.count()
-    ocupadas = consultas.filter(estadoConsulta__estadoConsulta='Ocupado').count()
-    porcentaje_ocupacion = round((ocupadas / total_consultas) * 100, 2) if total_consultas else 0
-
-    # Tiempos muertos por box
-    tiempos_muertos = defaultdict(int)
-    for box in Box.objects.all():
-        consultas_box = consultas.filter(box=box).order_by('fechaHoraInicio')
-        last_end = None
-        for consulta in consultas_box:
-            if last_end:
-                delta = (consulta.fechaHoraInicio - last_end).total_seconds() // 60  # minutos
-                if delta > 0:
-                    tiempos_muertos[box.idBox] += delta
-            last_end = consulta.fechaHoraFin
-    tiempos_muertos = dict(tiempos_muertos)
-
-    # Uso por especialidad
-    uso_por_especialidad = defaultdict(int)
-    for consulta in consultas:
-        esp = consulta.medico.especialidad.nombreEspecialidad
-        uso_por_especialidad[esp] += 1
-
-    return {
-        "porcentaje_ocupacion": porcentaje_ocupacion,
-        "tiempos_muertos": tiempos_muertos,
-        "uso_por_especialidad": uso_por_especialidad,
-        "rango": {"desde": str(date_from), "hasta": str(date_to)},
-    }

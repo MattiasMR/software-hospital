@@ -19,20 +19,24 @@ export default function HeaderTop() {
 
   return (
     <div className="flex items-center bg-white px-6" style={{ height: '4rem' }}>
-      {/* logo takes up all the left-over space */}
-      <div className="flex items-center flex-shrink-0">
-        <img src={logo} alt="Hospital Padre Hurtado" className="h-12" />
+  
+      {/* Logo a la izquierda */}
+      <div className="w-10 h-full flex items-center justify-center bg-white ml-1 pt-2">
+        <img 
+          src={logo} 
+          alt="Hospital Padre Hurtado" 
+          className="h-full w-auto object-contain" />
       </div>
 
-      {/* push the clock into the exact center */}
+      {/* Hora al centro */}
       <div className="flex-1 text-center">
-        <p className="text-sm font-medium">{formattedDate}</p>
-        <p className="text-sm">
-          {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <p className="text-m font-medium">{formattedDate}</p>
+        <p className="text-m">
+          {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
         </p>
       </div>
 
-      {/* icons on the right */}
+      {/* Iconos a la derecha */}
       <div className="flex items-center gap-4">
         <button
           onClick={handleLogout}
