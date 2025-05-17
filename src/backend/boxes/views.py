@@ -1,45 +1,113 @@
 import json
-import time
-from .models import Box
+from datetime import datetime
 from django.http import StreamingHttpResponse
-from rest_framework import generics, permissions
-from django.views.decorators.http import condition
-from .serializers import BoxStatusSerializer, BoxDetailSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
+from boxes.models import Box, Consulta
+from .management.helpers.services import get_boxes_with_kpis, get_reportes_kpis
 
-class BoxStatusListView(generics.ListAPIView):
-    serializer_class = BoxStatusSerializer
+# Endpoint REST para boxes (estado actual + KPIs)
+class BoxStatusListView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        qs = Box.objects.select_related('tipoBox','disponibilidadBox','pasillo','medico')
+    def get(self, request):
+        date_str = request.GET.get("date")
+        from datetime import datetime
+        from django.utils import timezone
 
-        return qs
+        if date_str:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        else:
+            target_date = timezone.localdate()
 
-class BoxDetailView(generics.RetrieveAPIView):
-    """
-    GET /api/boxes/{id}/detail/
-    Devuelve detalle de box + sus consultas (agendas).
-    """
-    queryset = Box.objects.prefetch_related('consultas__medico', 'consultas__estadoConsulta').all()
-    serializer_class = BoxDetailSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    lookup_field = 'idBox'
+        data = get_boxes_with_kpis(target_date)
+        return Response(data)
+    
+# Endpoint REST para KPIs
+class ReporteKPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        date_from      = request.GET.get("date_from")
+        date_to        = request.GET.get("date_to")
+        especialidad   = request.GET.get("especialidad")
+
+        # Intenta parsear fechas
+        from datetime import datetime
+        df, dt = None, None
+        try:
+            if date_from:
+                df = datetime.strptime(date_from, "%Y-%m-%d").date()
+            if date_to:
+                dt = datetime.strptime(date_to, "%Y-%m-%d").date()
+        except Exception:
+            pass  # Si falla, será None y el helper usa fecha de hoy
+
+        data = get_reportes_kpis(df, dt, especialidad)
+        return Response(data)
+
+class BoxDetailView(APIView):
+    permission_classes = [IsAuthenticated]  # si quieres protegerlo
+
+    def get(self, request, idBox):
+        # Por defecto muestra las franjas de hoy, puedes cambiarlo por query param
+        date_str = request.GET.get("date")
+        if date_str:
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        else:
+            from django.utils import timezone
+            date = timezone.localdate()
+
+        try:
+            box = Box.objects.get(idBox=idBox)
+        except Box.DoesNotExist:
+            return Response({"error": "Box no encontrado"}, status=404)
+
+        consultas = Consulta.objects.filter(box=box, fechaHoraInicio__date=date).select_related("medico", "estadoConsulta").order_by("fechaHoraInicio")
+        franjas = [
+            {
+                "inicio": c.fechaHoraInicio.strftime("%H:%M"),
+                "fin": c.fechaHoraFin.strftime("%H:%M"),
+                "estado": c.estadoConsulta.estadoConsulta,
+                "medico": c.medico.nombreCompleto if c.medico else None,
+            }
+            for c in consultas
+        ]
+
+        total = consultas.count()
+        ocupadas = consultas.filter(estadoConsulta__estadoConsulta='Ocupado').count()
+        porcentaje_ocupacion = int((ocupadas / total) * 100) if total else 0
+
+        data = {
+            "idBox": box.idBox,
+            "numeroBox": getattr(box, "numeroBox", box.idBox),
+            "tipoBox": box.tipoBox.tipoBox,
+            "disponibilidad": box.disponibilidadBox.disponibilidad,
+            "pasillo": box.pasillo.nombrePasillo,
+            "porcentajeOcupacion": porcentaje_ocupacion,  # <-- AGREGA ESTO!
+            "franjas": franjas,
+        }
+        return Response(data)
 
 def boxes_stream(request):
+    import time
+    from django.utils import timezone
+
+    date_str = request.GET.get("date")
+    if date_str:
+        from datetime import datetime
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    else:
+        target_date = timezone.localdate()
+
     def event_stream():
         while True:
-            # Obtén tus boxes con sus relaciones
-            qs = Box.objects.select_related('tipoBox', 'disponibilidadBox').all()
-            data = [
-                {
-                    "idBox": b.idBox,
-                    "numeroBox": b.numeroBox,
-                    "tipoBox": b.tipoBox.tipoBox,
-                    "disponibilidad": b.disponibilidadBox.disponibilidad
-                }
-                for b in qs
-            ]
-            # SSE manda esta línea con “data: JSON\n\n”
+            data = get_boxes_with_kpis(target_date)
             yield f"data: {json.dumps(data)}\n\n"
-            time.sleep(1)  # poll interno cada 5s (puedes subir a 10s o eliminar y usar signals)
-    return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+            time.sleep(2)
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    return response

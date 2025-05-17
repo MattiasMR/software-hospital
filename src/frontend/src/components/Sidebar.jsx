@@ -21,11 +21,9 @@ export default function Sidebar() {
   const { pathname } = useLocation();
 
   return (
-    
     <aside className="bg-white w-16 flex flex-col items-center gap-4 py-4 shadow">
       {icons.map(({ icon: Icon, to }, i) =>
         to ? (
-          /* -- Home con link al dashboard -- */
           <Link key={i} to={to}>
             <Icon
               className={`h-7 w-7 cursor-pointer ${

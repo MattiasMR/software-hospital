@@ -1,31 +1,32 @@
 import { useState, useEffect } from 'react';
 
-export default function useBoxesSSE() {
+export default function useBoxesSSE(date) {
   const [boxes, setBoxes] = useState([]);
 
   useEffect(() => {
-    // Conecta al endpoint SSE
-    const evtSource = new EventSource('http://127.0.0.1:8000/api/boxes/stream/');
+    const params = date
+      ? `?date=${date.toISOString().slice(0, 10)}`
+      : '';
+    const evtSource = new EventSource(
+      `http://127.0.0.1:8000/api/boxes/stream/${params}`
+    );
 
     evtSource.onmessage = e => {
       try {
         setBoxes(JSON.parse(e.data));
       } catch (err) {
-        console.error('Error parseando SSE:', err);
+        setBoxes([]);
       }
     };
 
     evtSource.onerror = err => {
-      console.error('Error SSE:', err);
-      // si quieres reconectar automáticamente:
-      // evtSource.close();
-      // setTimeout(() => {/* reabrir EventSource */}, 5000);
+      evtSource.close();
     };
 
     return () => {
       evtSource.close();
     };
-  }, []);
+  }, [date]);
 
   return boxes;
 }

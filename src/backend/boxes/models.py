@@ -1,5 +1,3 @@
-# src/backend/boxes/models.py
-
 from django.db import models
 
 class DisponibilidadBox(models.Model):
@@ -189,7 +187,9 @@ class Consulta(models.Model):
         Medico,
         on_delete=models.CASCADE,
         db_column='idMedico',
-        related_name='consultas'
+        related_name='consultas',
+        null=True,          
+        blank=True  
     )
     estadoConsulta = models.ForeignKey(
         EstadoConsulta,

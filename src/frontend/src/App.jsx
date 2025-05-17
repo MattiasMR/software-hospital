@@ -1,7 +1,8 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Reportes from './pages/Reportes';
+import DetalleBox from './pages/DetalleBox';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('accessToken');
@@ -21,6 +22,24 @@ export default function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/reportes"
+          element={
+            <PrivateRoute>
+              <Reportes />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/detalle-box/:idBox"
+          element={
+            <PrivateRoute>
+              <DetalleBox />
+            </PrivateRoute>
+          }
+        />
+
+
         {/* Redirige cualquier otra ruta a login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
