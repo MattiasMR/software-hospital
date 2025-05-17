@@ -1,4 +1,3 @@
-// src/components/Sidebar.jsx
 import { Link, useLocation } from "react-router-dom";
 import {
   HomeIcon,

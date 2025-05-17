@@ -1,108 +1,91 @@
-// src/pages/Dashboard.jsx
-import { useState, useEffect } from 'react';
-import { useSearchParams }      from 'react-router-dom';
+import { useState, useEffect } from 'react'
+import { useSearchParams }      from 'react-router-dom'
 
-import Sidebar                   from '../components/Sidebar';
-import Header                    from '../components/Header';
-import FiltersBar                from '../components/FiltersBar';
-import BoxCard                   from '../components/BoxCard';
+import Sidebar                  from '../components/Sidebar'
+import Header                   from '../components/Header'
+import BoxCard                  from '../components/BoxCard'
 
-import bg                        from '../assets/images/login-bg.png';
+import bg                       from '../assets/images/login-bg.png'
 
 export default function Dashboard() {
-  const [boxes, setBoxes]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+  const [boxes, setBoxes]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState(null)
 
-  // fecha desde query o hoy
-  const [searchParams] = useSearchParams();
-  const dateParam      = searchParams.get('date');
-  const [date, setDate] = useState(
-    dateParam ? new Date(dateParam) : new Date()
-  );
-  const isoDate = date.toISOString().slice(0, 10);
+  // Fecha desde query o hoy
+  const [searchParams] = useSearchParams()
+  const dateParam      = searchParams.get('date')
+  const [date, setDate] = useState(dateParam ? new Date(dateParam) : new Date())
+  const isoDate       = date.toISOString().slice(0, 10)
 
-  // filtros
+  // Filtros (por implementar)
   const [filters, setFilters] = useState({
     status:       'ALL',
     box:          'ALL',
-    po:           'ALL',
     pasillo:      'ALL',
     medico:       'ALL',
-    especialidad: 'ALL',
-  });
+    especialidad: 'ALL'
+  })
 
   useEffect(() => {
-    setLoading(true);
-    const token = localStorage.getItem('accessToken');
+    setLoading(true)
+    const token = localStorage.getItem('accessToken')
 
     fetch(`http://127.0.0.1:8000/api/boxes/status/?date=${isoDate}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => {
         if (res.status === 401) {
-          window.location.href = '/login';
-          throw new Error('No autorizado');
+          window.location.href = '/login'
+          throw new Error('No autorizado')
         }
-        if (!res.ok) {
-          throw new Error('Error al cargar boxes');
-        }
-        return res.json();
+        if (!res.ok) throw new Error('Error al cargar boxes')
+        return res.json()
       })
       .then(data => {
-        setBoxes(data);
-        setError(null);
+        setBoxes(data)
+        setError(null)
       })
       .catch(err => {
-        console.error(err);
-        setError(err.message);
+        console.error(err)
+        setError(err.message)
       })
-      .finally(() => setLoading(false));
-  }, [isoDate]);
+      .finally(() => setLoading(false))
+  }, [isoDate])
 
-  if (loading) return <p className="p-6">Cargando boxes…</p>;
-  if (error)   return <p className="p-6 text-red-600">{error}</p>;
+  if (loading) return <p className="p-6">Cargando boxes…</p>
+  if (error)   return <p className="p-6 text-red-600">{error}</p>
 
-  // agrupar por pasillo
+  // Agrupar por pasillo
   const boxesByPasillo = boxes.reduce((acc, box) => {
-    const p = box.pasillo || 'Sin pasillo';
-    acc[p] = acc[p] || [];
-    acc[p].push(box);
-    return acc;
-  }, {});
+    const p = box.pasillo.nombrePasillo || 'Sin pasillo'
+    acc[p] = acc[p] || []
+    acc[p].push(box)
+    return acc
+  }, {})
 
   return (
     <div className="relative flex h-screen">
-      {/* fondo DEBAJO de todo */}
+      {/* Fondo DEBAJO de todo */}
       <div
         className="absolute inset-0 bg-cover bg-center opacity-70 -z-10"
         style={{ backgroundImage: `url(${bg})` }}
       />
 
-      {/* sidebar sólido encima del fondo */}
+      {/* Sidebar */}
       <Sidebar />
 
-      {/* contenido principal */}
-      <div className="relative flex-1 flex flex-col">
-      
-        {/* header */}
-        <div className="relative z-10">
-          <Header />
-        </div>
+      {/* Contenido principal */}
+      <div className="relative flex-1 flex flex-col overflow-hidden">
+        <Header
+          date={date}
+          onDateChange={d => setDate(d)}
+          filters={filters}
+          setFilters={setFilters}
+          boxes={boxes}
+        />
 
-        {/* filtros */}
-        <div className="px-6 py-4">
-          <FiltersBar
-            date={date}
-            onDateChange={d => setDate(d)}
-            filters={filters}
-            setFilters={setFilters}
-            boxes={boxes}
-          />
-        </div>
-
-        {/* listado de boxes */}
-        <main className="flex-1 overflow-auto px-6 pb-6">
+        <main className="flex-1 overflow-auto p-6">
           {Object.entries(boxesByPasillo)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([pasillo, group]) => (
@@ -112,12 +95,10 @@ export default function Dashboard() {
                   {group.map(box => (
                     <BoxCard
                       key={box.idBox}
-                      id={box.idBox}
-                      numero={box.numeroBox}
+                      numero={box.idBox}
                       tipo={box.tipoBox.tipoBox}
-                      disponibilidad={box.disponibilidad.disponibilidad}
+                      disponibilidad={box.disponibilidadBox.disponibilidad}
                       medico={box.medico?.nombreCompleto}
-                      porcentajeOcupacion={box.porcentajeOcupacion}
                     />
                   ))}
                 </div>
@@ -126,5 +107,5 @@ export default function Dashboard() {
         </main>
       </div>
     </div>
-  );
+  )
 }

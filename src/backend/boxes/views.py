@@ -1,4 +1,3 @@
-
 import json
 import time
 from .models import Box
@@ -9,13 +8,12 @@ from .serializers import BoxStatusSerializer, BoxDetailSerializer
 
 
 class BoxStatusListView(generics.ListAPIView):
-    """
-    GET /api/boxes/status/
-    Lista estado actual de todos los boxes.
-    """
-    queryset = Box.objects.select_related('tipoBox', 'disponibilidadBox').all()
     serializer_class = BoxStatusSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = Box.objects.select_related('tipoBox','disponibilidadBox','pasillo','medico')
+
+        return qs
 
 class BoxDetailView(generics.RetrieveAPIView):
     """
