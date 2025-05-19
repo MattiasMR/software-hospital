@@ -1,39 +1,94 @@
-// React
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+// src/pages/Dashboard.jsx
 
-// React hooks
-import useBoxesSSE from "../hooks/useBoxesSSE";
-import useBoxFilters from "../hooks/useBoxFilters";
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
-// Components
-import Offcanvas      from "../components/Offcanvas";
-import HeaderTop from "../components/HeaderTop";
-import HeaderBottom from "../components/HeaderBottom";
-import FiltersPanel   from "../components/FiltersPanel";
-import Sidebar from "../components/Sidebar";
-import BoxCard from "../components/BoxCard";
+// hooks
+import { useBoxesQuery, fetchBoxes } from '../hooks/useBoxesQuery';
+import useBoxFilters from '../hooks/useBoxFilters';
 
-// Assets
-import bg from "../assets/images/login-bg.png";
+// components
+import Offcanvas    from '../components/Offcanvas';
+import HeaderTop    from '../components/HeaderTop';
+import HeaderBottom from '../components/HeaderBottom';
+import FiltersPanel from '../components/FiltersPanel';
+import Sidebar      from '../components/Sidebar';
+import BoxCard      from '../components/BoxCard';
 
+// asset
+import bg from '../assets/images/login-bg.png';
+
+// Helper to get today's date as YYYY-MM-DD
+function todayYYYYMMDD() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export default function Dashboard() {
-  const [date, setDate] = useState(new Date());
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const token = localStorage.getItem('accessToken') || '';
+
+  // ALWAYS treat the date as a string in YYYY-MM-DD
+  const paramDate = searchParams.get('date');
+  const [dateStr, setDateStr] = useState(paramDate || todayYYYYMMDD());
+
+  // Parse dateStr only for display purposes (e.g., in DatePicker or headers)
+  const dateObj = React.useMemo(() => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }, [dateStr]);
+
+  // Keep picker and URL param in sync
+  const handleDateChange = newDateStr => {
+    setDateStr(newDateStr);
+    setSearchParams({ date: newDateStr }, { replace: true });
+  };
+
+  // Prefetch all boxes for current month
+  useEffect(() => {
+    const [year, month] = dateStr.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const ds = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      queryClient.prefetchQuery({
+        queryKey: ['boxes', ds],
+        queryFn: () => fetchBoxes(ds, token),
+        staleTime: 1000 * 60 * 60,
+      });
+    }
+  }, [dateStr, queryClient, token]);
+
+  // Filters and filter panel
   const [filters, setFilters] = useState({
-    disponibilidad: "ALL",
-    po:            "ALL",
-    box:           "ALL",
-    pasillo:       "ALL",
-    medico:        "ALL",
+    disponibilidad: 'ALL',
+    po: 'ALL',
+    box: 'ALL',
+    pasillo: 'ALL',
+    medico: 'ALL',
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  /* ---------------- datos desde el backend ---------------- */
-  const boxes = useBoxesSSE(date);              // SSE en tiempo real
+  // Fetch boxes for selected date
+  const {
+    data: boxes = [],
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+    isPreviousData,
+  } = useBoxesQuery(dateObj);
+
+  // In-memory filter
   const { filteredBoxes } = useBoxFilters(boxes, filters);
 
-  /* ---------------- listas únicas para los combos ---------------- */
+  // Unique lists for selects
   const pasillos = useMemo(
     () => [...new Set(boxes.map(b => b.pasillo))].filter(Boolean).sort(),
     [boxes]
@@ -43,26 +98,40 @@ export default function Dashboard() {
     [boxes]
   );
   const medicos = useMemo(
-    () => [...new Set(boxes.map(b => b.medicoAsignado).filter(Boolean))].sort(),
+    () => [...new Set(boxes.flatMap(b => b.medicosDelDia))].sort(),
     [boxes]
   );
 
-  const navigate = useNavigate();
-
-  /* ---------------- agrupar tarjetas por pasillo ---------------- */
+  // Group by pasillo
   const boxesByPasillo = useMemo(() => {
     return filteredBoxes.reduce((acc, box) => {
-      const p = box.pasillo || "Sin pasillo";
+      const p = box.pasillo || 'Sin pasillo';
       acc[p] = acc[p] || [];
       acc[p].push(box);
       return acc;
     }, {});
   }, [filteredBoxes]);
 
-  /* ============================================================= */
+  // Ahora:
+  if (isLoading && boxes.length === 0) {
+    // Solo si no hay ningún dato cacheado aún, muestra el loading
+    return <p className="p-6 text-center">Cargando boxes…</p>;
+  }
+  if (isError) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        Error al cargar boxes.{" "}
+        <button onClick={() => refetch()} className="underline">
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  // Render
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar className="flex-none w-14 pt-21" />
+      <Sidebar />
 
       <div className="relative flex-1 flex flex-col">
         {/* fondo difuminado */}
@@ -74,12 +143,14 @@ export default function Dashboard() {
         <HeaderTop />
 
         <HeaderBottom
-          date={date}
-          setDate={setDate}
+          title="Dashboard de Boxes"
+          // Pass the raw string for input type=date
+          date={dateStr}
+          setDate={handleDateChange}
           onOpenFilters={() => setShowFilters(true)}
+          // In your HeaderBottom, use the string for <input type="date" value={date} />
         />
 
-        {/* ---------------- listados de boxes ---------------- */}
         <main className="flex-1 overflow-auto py-6">
           <div className="max-w-screen-xl mx-auto px-4">
             {Object.entries(boxesByPasillo)
@@ -89,7 +160,6 @@ export default function Dashboard() {
                   <h2 className="inline-block bg-white rounded-full px-6 py-2 text-xl font-bold mb-4 shadow">
                     {pasillo}
                   </h2>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {group.map(box => (
                       <BoxCard
@@ -100,11 +170,7 @@ export default function Dashboard() {
                         medico={box.medicoAsignado}
                         porcentajeOcupacion={box.porcentajeOcupacion}
                         onClick={() =>
-                          navigate(
-                            `/detalle-box/${box.idBox}?date=${date
-                              .toISOString()
-                              .slice(0, 10)}`
-                          )
+                          navigate(`/detalle-box/${box.idBox}?date=${dateStr}`)
                         }
                       />
                     ))}
@@ -115,13 +181,12 @@ export default function Dashboard() {
         </main>
       </div>
 
-      {/* ---------------- panel off-canvas con filtros ---------------- */}
+      {/* off-canvas de filtros */}
       <Offcanvas open={showFilters} onClose={() => setShowFilters(false)}>
         <h2 className="text-xl font-semibold mb-4">Filtros</h2>
-
         <FiltersPanel
-          date={date}
-          setDate={setDate}          // si quieres permitir fecha dentro del panel tmb.
+          date={dateStr}
+          setDate={handleDateChange}
           filters={filters}
           setFilters={setFilters}
           pasillos={pasillos}

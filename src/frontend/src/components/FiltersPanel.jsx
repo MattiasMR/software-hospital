@@ -4,7 +4,10 @@ export default function FiltersPanel({
 }) {
   const chip = "w-full px-3 py-2 rounded bg-gray-100 text-sm";
 
-  const upd = key => e => setFilters({ ...filters, [key]: e.target.value });
+  const upd = key => e => setFilters({ 
+    ...filters, 
+    [key]: e.target.value 
+  });
 
   const DEFAULT_FILTERS = {
       disponibilidad: "ALL",

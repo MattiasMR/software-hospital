@@ -1,17 +1,76 @@
-from django.core.management.base import BaseCommand
-from django.utils import timezone
-from boxes.models import (
-    Box, Especialidad, Pasillo, Medico, EstadoConsulta, Jornada, Consulta,
-    DisponibilidadBox, BoxEspecialidad
-)
-from datetime import datetime, timedelta, time
+# boxes/management/commands/generate_data.py
+from __future__ import annotations
+
 import random
+from datetime import datetime, time, timedelta
+from typing import List
+
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.utils import timezone
+
+from boxes.models import (
+    Box,
+    BoxEspecialidad,
+    Consulta,
+    DisponibilidadBox,
+    Especialidad,
+    EstadoConsulta,
+    Jornada,
+    Medico,
+    Pasillo,
+)
+
+# Configurables por flags ──────────────────────────────────────────────
+DEFAULT_SEED = 42
+DEFAULT_DAYS = 7
+BOXES_POR_PASILLO = 8
+FRANJAS_HORAS = range(8, 22)  # 08:00-22:00
+
 
 class Command(BaseCommand):
-    help = "Genera datos de prueba realistas con restricciones por médico y box"
+    help = "Genera datos de prueba realistas con restricciones por médico y box."
 
-    def handle(self, *args, **options):
-        self.stdout.write("⚠️  Esto eliminará todos los datos previos.")
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--days", type=int, default=DEFAULT_DAYS,
+            help=f"Días hacia adelante a generar (default {DEFAULT_DAYS})",
+        )
+        parser.add_argument(
+            "--seed", type=int, default=DEFAULT_SEED,
+            help=f"Semilla del RNG para tener datos reproducibles (default {DEFAULT_SEED})",
+        )
+
+    # ──────────────────────────────────────────────────────────────────
+    def handle(self, *args, **opts):
+        rng_seed: int = opts["seed"]
+        n_days: int = opts["days"]
+
+        random.seed(rng_seed)
+        self.stdout.write(
+            f"🔄  Generando datos de prueba (seed={rng_seed}, días={n_days}) ..."
+        )
+
+        with transaction.atomic():
+            self._reset_tablas()
+            especialidades = self._crea_catalogos_basicos()
+            pasillos = self._crea_pasillos()
+            boxes = self._crea_boxes(pasillos, especialidades)
+            medicos = self._crea_medicos(especialidades)
+            self._crea_consultas(boxes, medicos, n_days)
+
+        self.stdout.write(
+            self.style.SUCCESS("✅ ¡Datos de prueba generados correctamente!")
+        )
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+    def _reset_tablas(self):
+        """Borra TODO lo dependiente; orden importa por FK."""
+        self.stdout.write("🧹  Limpiando tablas …")
+
         Consulta.objects.all().delete()
         BoxEspecialidad.objects.all().delete()
         Box.objects.all().delete()
@@ -21,98 +80,170 @@ class Command(BaseCommand):
         Especialidad.objects.all().delete()
         Jornada.objects.all().delete()
         EstadoConsulta.objects.all().delete()
-        self.stdout.write("🔄️  Generando datos.")
-        # Catálogos base
-        disp_hab = DisponibilidadBox.objects.create(disponibilidad='Habilitado')
-        disp_inh = DisponibilidadBox.objects.create(disponibilidad='Inhabilitado')
-        especialidades = [Especialidad.objects.create(nombreEspecialidad=n) for n in [
-            'Cardiología', 'Ginecología', 'Pediatría', 'Traumatología']]
-        jornadas = [
-            Jornada.objects.create(jornadaInicio=time(8,0), jornadaFin=time(14,0)),
-            Jornada.objects.create(jornadaInicio=time(14,0), jornadaFin=time(22,0)),
-        ]
-        estados = {
-            "Pendiente": EstadoConsulta.objects.create(estadoConsulta="Pendiente"),
-            "Cancelada": EstadoConsulta.objects.create(estadoConsulta="Cancelada"),
-            "Completada": EstadoConsulta.objects.create(estadoConsulta="Completada"),
-        }
 
-        pasillos = [Pasillo.objects.create(nombrePasillo=f"Pasillo {chr(65+i)}") for i in range(4)]
-        boxes = []
+    # ------------------------------------------------------------------
+    def _crea_catalogos_basicos(self) -> List[Especialidad]:
+        self.stdout.write("📚  Creando catálogos …")
+
+        disp_hab  = DisponibilidadBox.objects.create(disponibilidad="Habilitado")
+        disp_inh  = DisponibilidadBox.objects.create(disponibilidad="Inhabilitado")
+        _ = (disp_hab, disp_inh)  # noqa: F841 sólo para dejar claro que se usan
+
+        especialidades = [
+            Especialidad.objects.create(nombreEspecialidad=n)
+            for n in ("Cardiología", "Ginecología", "Pediatría", "Traumatología")
+        ]
+
+        # Dos turnos de 6 h
+        Jornada.objects.bulk_create(
+            [
+                Jornada(jornadaInicio=time(8, 0),  jornadaFin=time(14, 0)),
+                Jornada(jornadaInicio=time(14, 0), jornadaFin=time(22, 0)),
+            ]
+        )
+
+        EstadoConsulta.objects.bulk_create(
+            [
+                EstadoConsulta(estadoConsulta="Pendiente"),
+                EstadoConsulta(estadoConsulta="Cancelada"),
+                EstadoConsulta(estadoConsulta="Completada"),
+            ]
+        )
+
+        return especialidades
+
+    # ------------------------------------------------------------------
+    def _crea_pasillos(self) -> List[Pasillo]:
+        pasillos = [
+            Pasillo.objects.create(nombrePasillo=f"Pasillo {chr(65+i)}")
+            for i in range(4)
+        ]
+        self.stdout.write(f"🚪  Pasillos creados: {len(pasillos)}")
+        return pasillos
+
+    # ------------------------------------------------------------------
+    def _crea_boxes(self, pasillos, especialidades) -> List[Box]:
+        disp_hab = DisponibilidadBox.objects.get(disponibilidad="Habilitado")
+        disp_inh = DisponibilidadBox.objects.get(disponibilidad="Inhabilitado")
+
+        boxes: List[Box] = []
+        numero_global = 1
+
         for pasillo in pasillos:
-            for i in range(8):
-                disponibilidad = random.choices([disp_hab, disp_inh], weights=[0.85, 0.15])[0]
+            for _ in range(BOXES_POR_PASILLO):
+                disponibilidad = random.choices(
+                    (disp_hab, disp_inh), weights=(0.85, 0.15)
+                )[0]
                 box = Box.objects.create(
                     pasillo=pasillo,
                     disponibilidadBox=disponibilidad,
                 )
-                box_esps = random.sample(especialidades, k=random.randint(1, 2))
+                # muchas-a-muchas
+                box_esps = random.sample(
+                    especialidades, k=random.randint(1, 2)
+                )
                 box.especialidades.set(box_esps)
+
+                # número correlativo visible al front
+                box.numeroBox = numero_global  # type: ignore[attr-defined]
+                numero_global += 1
+
                 boxes.append(box)
-        habilitados = [b for b in boxes if b.disponibilidadBox.disponibilidad == "Habilitado"] # debug
-        print("Boxes habilitados:", len(habilitados)) # debug
-        print("Boxes inhabilitados:", len(boxes) - len(habilitados)) # debug
-        nombres = [
-            "Fernanda Soto", "Javier Sánchez", "Josefa Rojas", "Camila Morales", "María González",
-            "Carlos Muñoz", "Sofía Fernández", "Diego Ramírez", "Alejandra Ruiz", "Andrés Castro"
-        ]
-        medicos = []
-        for nombre in nombres:
-            especialidad = random.choice(especialidades)
-            jornada = random.choice(jornadas)
-            medico = Medico.objects.create(
-                nombreCompleto=nombre,
-                especialidad=especialidad,
-                jornada=jornada
+
+        self.stdout.write(f"📦  Boxes generados: {len(boxes)}")
+        return boxes
+
+    # ------------------------------------------------------------------
+    def _crea_medicos(self, especialidades) -> List[Medico]:
+        nombres = (
+            "Fernanda Soto", "Javier Sánchez", "Josefa Rojas", "Camila Morales",
+            "María González", "Carlos Muñoz", "Sofía Fernández", "Diego Ramírez",
+            "Alejandra Ruiz", "Andrés Castro"
+        )
+        jornadas = list(Jornada.objects.all())
+
+        medicos = [
+            Medico(
+                nombreCompleto=n,
+                especialidad=random.choice(especialidades),
+                jornada=random.choice(jornadas),
             )
-            medicos.append(medico)
+            for n in nombres
+        ]
+        Medico.objects.bulk_create(medicos)
+        self.stdout.write(f"🩺  Médicos generados: {len(medicos)}")
+        return list(Medico.objects.all())  # con IDs asignados
 
-        N_DIAS = 7
+    # ------------------------------------------------------------------
+    def _crea_consultas(self, boxes, medicos, n_days: int):
+        estados = {
+            e.estadoConsulta: e for e in EstadoConsulta.objects.all()
+        }
         hoy = timezone.localdate()
-        for day in range(N_DIAS):
-            fecha = hoy + timedelta(days=day)
-            for box in boxes:
-                if box.disponibilidadBox.disponibilidad == 'Inhabilitado':
-                    continue
-                box_esps = list(box.especialidades.all())
-                consultas_box_medico = {}  # (medico_id) -> [horas asignadas]
+        consultas_bulk: List[Consulta] = []
 
-                for h in range(8, 22):
-                    hora_inicio = time(h, 0)
-                    hora_fin = time(h+1, 0)
-                    # Médicos con especialidad compatible y jornada activa en esa hora
+        for offset in range(n_days):
+            fecha = hoy + timedelta(days=offset)
+
+            for box in boxes:
+                if box.disponibilidadBox.disponibilidad == "Inhabilitado":
+                    continue
+
+                box_esps = list(box.especialidades.all())
+                horas_medico: dict[int, List[int]] = {}
+
+                for h in FRANJAS_HORAS:
+                    hora_ini = time(h, 0)
+                    hora_fin = time(h + 1, 0)
+
+                    # Médicos con especialidad compatible y turno activo
                     medicos_validos = [
-                        m for m in medicos
+                        m
+                        for m in medicos
                         if m.especialidad in box_esps
-                        and m.jornada.jornadaInicio <= hora_inicio
+                        and m.jornada.jornadaInicio <= hora_ini
                         and m.jornada.jornadaFin >= hora_fin
                     ]
+                    if not medicos_validos:
+                        continue
+
                     random.shuffle(medicos_validos)
                     for medico in medicos_validos:
-                        lista = consultas_box_medico.setdefault(medico.idMedico, [])
-                        # Limita a 3 consultas totales y no más de 2 seguidas
+                        lista = horas_medico.setdefault(medico.id, [])
+                        # máx 3 consultas totales y no más de 2 consecutivas
                         if len(lista) >= 3:
                             continue
-                        if len(lista) >= 2 and h-1 in lista and h-2 in lista:
-                            continue  # Ya tiene 2 consecutivas previas
-                        # 30% probabilidad de consulta
-                        if (random.random() < 0.8 and len(Consulta.objects.filter(box=box)) < 5) or (random.random() < 0.4 and len(Consulta.objects.filter(box=box)) < 14):
-                            inicio_dt = timezone.make_aware(datetime.combine(fecha, hora_inicio))
-                            fin_dt = timezone.make_aware(datetime.combine(fecha, hora_fin))
-                            # Estado
-                            if random.random() < 0.3:
-                                estado = estados["Pendiente"]
-                            elif random.random() < 0.1:
-                                estado = estados["Cancelada"]
-                            else:
-                                estado = estados["Completada"]
-                            Consulta.objects.create(
-                                box=box,
-                                medico=medico,
-                                estadoConsulta=estado,
-                                fechaHoraInicio=inicio_dt,
-                                fechaHoraFin=fin_dt
+                        if len(lista) >= 2 and h - 1 in lista and h - 2 in lista:
+                            continue
+
+                        # prob ≈ 30 % de generar consulta
+                        if random.random() < 0.3:
+                            inicio_dt = timezone.make_aware(
+                                datetime.combine(fecha, hora_ini)
+                            )
+                            fin_dt = inicio_dt + timedelta(hours=1)
+
+                            estado = (
+                                estados["Pendiente"]
+                                if random.random() < 0.3
+                                else estados["Cancelada"]
+                                if random.random() < 0.1
+                                else estados["Completada"]
+                            )
+
+                            consultas_bulk.append(
+                                Consulta(
+                                    box=box,
+                                    medico=medico,
+                                    estadoConsulta=estado,
+                                    fechaHoraInicio=inicio_dt,
+                                    fechaHoraFin=fin_dt,
+                                )
                             )
                             lista.append(h)
-                            break  # Solo un médico por franja
-        self.stdout.write(self.style.SUCCESS("✅ ¡Datos de prueba generados correctamente con restricciones!"))
+                            break  # sólo un médico por franja
+
+        Consulta.objects.bulk_create(consultas_bulk, batch_size=1000)
+        self.stdout.write(
+            f"📈  Consultas generadas: {Consulta.objects.count()}"
+        )

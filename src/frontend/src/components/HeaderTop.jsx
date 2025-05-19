@@ -3,7 +3,7 @@ import logo from '../assets/images/hospital-logo.png'
 import { useNavigate } from "react-router-dom";
 
 
-export default function HeaderTop() {
+export default function HeaderTop( {className = "" } ) {
   const now = new Date()
   const formattedDate = now.toLocaleDateString('es-CL', {
     day: '2-digit',
@@ -18,14 +18,14 @@ export default function HeaderTop() {
   }
 
   return (
-    <div className="flex items-center bg-white px-6" style={{ height: '4rem' }}>
+    <div className="flex items-center bg-white" style={{ height: '5rem' }}>
   
       {/* Logo a la izquierda */}
-      <div className="w-10 h-full flex items-center justify-center bg-white ml-1 pt-2">
+      <div className="w-auto h-full flex items-center justify-center bg-white">
         <img 
           src={logo} 
           alt="Hospital Padre Hurtado" 
-          className="h-full w-auto object-contain" />
+          className="h-full w-auto" />
       </div>
 
       {/* Hora al centro */}
@@ -37,7 +37,7 @@ export default function HeaderTop() {
       </div>
 
       {/* Iconos a la derecha */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 pr-4">
         <button
           onClick={handleLogout}
           className="mt-1 px-3 py-1 rounded-full bg-gray-200 text-gray-800 font-semibold hover:bg-gray-300 transition text-xs"

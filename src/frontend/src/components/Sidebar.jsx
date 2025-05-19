@@ -9,11 +9,11 @@ import {
 } from "@heroicons/react/24/solid";
 
 const icons = [
-  { icon: HomeIcon, to: "/" },
+  { icon: HomeIcon, to: "/dashboard" },
   { icon: MagnifyingGlassIcon },
   { icon: ExclamationTriangleIcon },
   { icon: CalendarIcon },
-  { icon: ChartBarIcon },
+  { icon: ChartBarIcon, to: "/reportes" },
   { icon: Cog6ToothIcon },
 ];
 
@@ -21,7 +21,7 @@ export default function Sidebar( {className = "" }) {
   const { pathname } = useLocation();
 
   return (
-    <aside className={`bg-white flex flex-col items-center gap-4 shadow ${className}`}>
+    <aside className={`bg-white flex flex-col items-center gap-4 shadow w-14 pt-28 ${className}`}>
       {icons.map(({ icon: Icon, to }, i) =>
         to ? (
           <Link key={i} to={to}>

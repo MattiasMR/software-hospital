@@ -14,11 +14,11 @@ export default function Login() {
   const navigate = useNavigate();
 
   // Si ya hay token, salta directo a dashboard
-  useEffect(() => {
-    if (localStorage.getItem('accessToken')) {
-      navigate('/dashboard');
-    }
-  }, [navigate]);
+  // useEffect(() => {
+  //   if (localStorage.getItem('accessToken')) {
+  //     navigate('/dashboard');
+  //   }
+  // }, [navigate]);
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -49,16 +49,20 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center">
-      {/* Imagen de fondo */}
+
       <div
         className="absolute inset-0 w-full h-full bg-cover bg-center opacity-70"
         style={{ backgroundImage: `url(${bg})` }}
       />
+
+
       <div className="relative z-10 w-[90%] max-w-[600px] px-4">
-        <WhiteCard>
+        <WhiteCard className='p-20'>
+          
           <div className="flex justify-center mb-6">
-            <img src={logo} alt="Hospital logo" className="w-44" />
+            <img src={logo} alt="Hospital logo" className="w-70" />
           </div>
+
           {error && (
             <div className="flex items-center bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6 text-sm" role="alert">
               <img src={errorIcon} alt="Error" className="h-5 w-5 mr-3" />
@@ -66,7 +70,7 @@ export default function Login() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
+          <form onSubmit={handleSubmit} className="space-y-4 flex flex-col items-center" autoComplete="on">
             <input
               type="text"
               autoComplete="username"
@@ -91,7 +95,7 @@ export default function Login() {
             />
             <button
               type="submit"
-              className="w-full py-3 bg-cyan-500 text-white rounded-full font-semibold hover:bg-cyan-600 transition disabled:opacity-50"
+              className="w-[calc(100%-5rem)] px-4 py-3 bg-cyan-500 text-white rounded-full font-semibold hover:bg-cyan-600 transition disabled:opacity-50"
               disabled={submitting}
             >
               {submitting ? "Iniciando sesión..." : "Inicio de sesión"}
