@@ -53,9 +53,8 @@ export default function Dashboard() {
   // Prefetch all boxes for current month
   useEffect(() => {
     const [year, month] = dateStr.split('-').map(Number);
-    const daysInMonth = new Date(year, month, 0).getDate();
 
-    for (let day = 1; day <= daysInMonth; day++) {
+    for (let day = 18; day <= 24; day++) {
       const ds = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       queryClient.prefetchQuery({
         queryKey: ['boxes', ds],
@@ -112,6 +111,7 @@ export default function Dashboard() {
     }, {});
   }, [filteredBoxes]);
 
+
   // Ahora:
   if (isLoading && boxes.length === 0) {
     // Solo si no hay ningún dato cacheado aún, muestra el loading
@@ -144,11 +144,9 @@ export default function Dashboard() {
 
         <HeaderBottom
           title="Dashboard de Boxes"
-          // Pass the raw string for input type=date
           date={dateStr}
           setDate={handleDateChange}
           onOpenFilters={() => setShowFilters(true)}
-          // In your HeaderBottom, use the string for <input type="date" value={date} />
         />
 
         <main className="flex-1 overflow-auto py-6">

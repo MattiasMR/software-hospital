@@ -69,4 +69,3 @@ class ConsultaAdmin(admin.ModelAdmin):
         'box__id',
         'medico__nombreCompleto',
     )
-    date_hierarchy = 'fechaHoraInicio'

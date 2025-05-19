@@ -61,9 +61,17 @@ export default function Reportes() {
 
   // datos de ejemplo para visualización
   const barData = Object.entries(kpi?.medicos_por_franja  ?? {})
-    .map(([franja, count]) => ({ franja, count }));
+    .map(([franja, count]) => ({ franja, count }))
+    .sort((a, b) => {
+      // extrae la hora de inicio, e.g. "09:00-10:00" → 9
+      const getHour = s => parseInt(s.split(':')[0], 10);
+      return getHour(a.franja) - getHour(b.franja);
+    });
+
+
   const pieData = Object.entries(kpi?.uso_por_especialidad ?? {})
     .map(([name, value]) => ({ name, value }));
+
   const COLORS  = ['#2dd4bf','#22d3ee','#38bdf8','#60a5fa','#818cf8','#a78bfa'];
 
   return (
@@ -115,7 +123,7 @@ export default function Reportes() {
 
                 {/* 1. Gráfico de barras */}
                 <WhiteCard className="flex flex-col items-center w-full h-full p-0"> 
-                <h3 className="mb-2 font-semibold pt-4">Médicos por franja</h3>
+                <h3 className="mb-2 font-semibold pt-4">Consultas por Franja Horaria</h3>
                 <div className="w-[calc(100%-2.5rem)] h-[calc(100%-2.5rem)] p-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
@@ -181,7 +189,7 @@ export default function Reportes() {
 
                 {/* 3. Gráfico circular */}
                 <WhiteCard className="flex flex-col items-center">
-                  <h3 className="mb-4 font-semibold">Horas por especialidad</h3>
+                  <h3 className="mb-4 font-semibold">Consultas por Especialidad</h3>
                   <div className="w-full h-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>

@@ -211,13 +211,13 @@ class Command(BaseCommand):
                     for medico in medicos_validos:
                         lista = horas_medico.setdefault(medico.id, [])
                         # máx 3 consultas totales y no más de 2 consecutivas
-                        if len(lista) >= 3:
+                        if len(lista) >= 4:
                             continue
                         if len(lista) >= 2 and h - 1 in lista and h - 2 in lista:
                             continue
 
                         # prob ≈ 30 % de generar consulta
-                        if random.random() < 0.3:
+                        if random.random() < 0.5:
                             inicio_dt = timezone.make_aware(
                                 datetime.combine(fecha, hora_ini)
                             )
