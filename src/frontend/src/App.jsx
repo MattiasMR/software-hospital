@@ -2,9 +2,12 @@
 
 import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import Login      from './pages/Login';
+import Resumen      from './pages/Resumen';
 import Dashboard  from './pages/Dashboard';
-import Reportes   from './pages/Reportes';
 import DetalleBox from './pages/DetalleBox';
+import Reportes   from './pages/Reportes';
+import Medicos   from './pages/Medicos';
+import DetalleMedicos   from './pages/DetalleMedicos';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('accessToken');
@@ -32,6 +35,15 @@ export default function App() {
 
         {/* rutas protegidas */}
         <Route
+          path="/resumen"
+          element={
+            <PrivateRoute>
+              <Resumen />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
           path="/dashboard"
           element={
             <PrivateRoute>
@@ -40,6 +52,16 @@ export default function App() {
           }
         />
         <Route
+          path="/detalle-box/:idBox"
+          element={
+            <PrivateRoute>
+              <DetalleBoxPage />
+            </PrivateRoute>
+          }
+        />
+
+
+        <Route
           path="/reportes"
           element={
             <PrivateRoute>
@@ -47,11 +69,21 @@ export default function App() {
             </PrivateRoute>
           }
         />
+
         <Route
-          path="/detalle-box/:idBox"
+          path="/medicos"
           element={
             <PrivateRoute>
-              <DetalleBoxPage />
+              <Medicos />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/medicos/:id/detalle"
+          element={
+            <PrivateRoute>
+              <DetalleMedicos />
             </PrivateRoute>
           }
         />

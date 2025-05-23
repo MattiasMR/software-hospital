@@ -32,16 +32,21 @@ class BoxStatusSimpleSerializer(serializers.Serializer):
                          )
 
 
-class FranjaHorarioSerializer(serializers.Serializer):
-    inicio        = serializers.CharField()
-    fin           = serializers.CharField()
-    medico        = serializers.CharField(allow_null=True)
-    especialidad  = serializers.CharField(allow_null=True)
-    estado        = serializers.CharField()                # “Pendiente”, “En curso”, etc.
+class ConsultaSerializer(serializers.Serializer):
+    inicio  = serializers.CharField()
+    fin     = serializers.CharField()
+    estado  = serializers.CharField()
 
+
+class TurnoSerializer(serializers.Serializer):
+    medico               = serializers.CharField()
+    especialidad         = serializers.CharField(allow_null=True)
+    rango                = serializers.CharField()
+    horasOcupadas        = serializers.FloatField()
+    porcentajeOcupacion  = serializers.IntegerField()
+    consultas            = ConsultaSerializer(many=True)
 
 class BoxDetalleSerializer(serializers.Serializer):
     pasillo             = serializers.CharField()
-    franjas             = FranjaHorarioSerializer(many=True)
-    porcentajeOcupacion = serializers.IntegerField()
+    turnos   = TurnoSerializer(many=True)
     

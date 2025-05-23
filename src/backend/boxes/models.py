@@ -80,7 +80,7 @@ class Medico(models.Model):
     especialidad = models.ForeignKey(
         Especialidad,
         on_delete=models.PROTECT,
-        db_column="idEspecialidad",      # ← vuelve a la FK numérica
+        db_column="idEspecialidad",
         related_name="medicos",
     )
     jornada = models.ForeignKey(
@@ -92,6 +92,10 @@ class Medico(models.Model):
 
     class Meta:
         db_table = "Medico"
+        indexes = [
+            Index(fields=["especialidad"]),
+            Index(fields=["jornada"]),
+        ]
 
     def __str__(self):
         return self.nombreCompleto
@@ -140,6 +144,10 @@ class Box(models.Model):
 
     class Meta:
         db_table = "Box"
+        indexes = [
+            Index(fields=["pasillo"]),
+            Index(fields=["disponibilidadBox"]),
+        ]
 
     def __str__(self):
         return f"Box {self.id}"
@@ -158,12 +166,15 @@ class BoxEspecialidad(models.Model):
     especialidad = models.ForeignKey(
         Especialidad,
         on_delete=models.CASCADE,
-        db_column="idEspecialidad",      # ← FK numérica
+        db_column="idEspecialidad",
     )
 
     class Meta:
         db_table = "BoxEspecialidad"
         unique_together = ("box", "especialidad")
+        indexes = [
+            Index(fields=["especialidad"]),
+        ]
 
 
 # ────────────────────────────────
@@ -211,7 +222,7 @@ class Consulta(models.Model):
     estadoConsulta = models.ForeignKey(
         EstadoConsulta,
         on_delete=models.PROTECT,
-        db_column="idEstadoConsulta",   # ← FK numérica
+        db_column="idEstadoConsulta",
         related_name="consultas",
     )
     fechaHoraInicio = models.DateTimeField()
@@ -227,7 +238,42 @@ class Consulta(models.Model):
         ]
         indexes = [
             Index(fields=["fechaHoraInicio", "box"]),
+            Index(fields=["fechaHoraInicio", "estadoConsulta"]),
+            Index(fields=["medico"]),
         ]
 
     def __str__(self):
         return f"Consulta {self.id}: Box {self.box_id} – Médico {self.medico_id}"
+
+class AsignacionTurno(models.Model):
+    id = models.AutoField(primary_key=True, db_column="idAsignacionTurno")
+    box = models.ForeignKey(
+        Box,
+        on_delete=models.CASCADE,
+        db_column="idBox",
+        related_name="asignaciones_turno",
+    )
+    medico = models.ForeignKey(
+        Medico,
+        on_delete=models.CASCADE,
+        db_column="idMedico",
+        related_name="asignaciones_turno",
+    )
+    fechaHoraInicio = models.DateTimeField()
+    fechaHoraFin = models.DateTimeField()
+
+    class Meta:
+        db_table = "AsignacionTurno"
+        constraints = [
+            CheckConstraint(
+                check=Q(fechaHoraFin__gt=F("fechaHoraInicio")),
+                name="asignacion_turno_fin_gt_inicio",
+            )
+        ]
+        indexes = [
+            Index(fields=["fechaHoraInicio", "box"]),
+            Index(fields=["medico"]),
+        ]
+
+    def __str__(self):
+        return f"Turno {self.id}: Box {self.box_id} – Médico {self.medico_id}"

@@ -40,7 +40,7 @@ export default function Login() {
       const { access } = await res.json();
       localStorage.setItem('accessToken', access);
       setSubmitting(false);
-      navigate('/dashboard');
+      navigate('/resumen');
     } catch (err) {
       setError(err.message || "Error de red");
       setSubmitting(false);

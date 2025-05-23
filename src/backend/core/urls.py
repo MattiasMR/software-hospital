@@ -6,6 +6,9 @@ from boxes.views import (
   BoxDetalleView, 
   BoxStatusListView, 
   ReportesView,
+  ResumenDashboardView,
+  BuscarMedicosView,
+  BoxDetalleV2View
 )
 
 urlpatterns = [
@@ -16,5 +19,7 @@ urlpatterns = [
     path("api/boxes/stream/", boxes_stream, name="boxes-stream"),
     path("api/boxes/<int:idBox>/detalle/", BoxDetalleView.as_view(), name="box-detalle"),
     path('api/boxes/reportes/', ReportesView.as_view(),    name='boxes-reportes'),
-
+    path("api/resumen/", ResumenDashboardView.as_view(), name="resumen-dashboard"),
+    path("api/medicos/", BuscarMedicosView.as_view(), name="buscar-medicos"),
+    path('api/boxes/<int:idBox>/detalle-v2/', BoxDetalleV2View.as_view(), name='box-detalle-v2'),
 ]

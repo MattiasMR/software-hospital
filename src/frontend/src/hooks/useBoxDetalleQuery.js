@@ -1,44 +1,32 @@
+// src/hooks/useBoxDetalleQuery.js
 import { useQuery } from '@tanstack/react-query';
 
 const formatDate = date => {
   const d = typeof date === 'string' ? new Date(date) : date;
-  const year  = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day   = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return [
+    d.getFullYear(),
+    String(d.getMonth()+1).padStart(2,'0'),
+    String(d.getDate()).padStart(2,'0'),
+  ].join('-');
 };
 
-const fetchBoxDetalle = async ({ queryKey }) => {
+async function fetchBoxDetalle({ queryKey }) {
   const [_key, idBox, dateStr, token] = queryKey;
   const res = await fetch(
-    `http://127.0.0.1:8000/api/boxes/${idBox}/detalle/?date=${dateStr}`,
+    `http://127.0.0.1:8000/api/boxes/${idBox}/detalle-v2/?date=${dateStr}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-
-  if (res.status === 401) {
-    localStorage.removeItem('accessToken');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
-  }
-
-  if (!res.ok) {
-    throw new Error(`Error ${res.status} al obtener detalle`);
-  }
-
+  if (!res.ok) throw new Error(`Error ${res.status} al obtener detalle`);
   return res.json();
-};
+}
 
 export function useBoxDetalleQuery(idBox, date) {
-  const token   = localStorage.getItem('accessToken') || '';
+  const token = localStorage.getItem('accessToken') || '';
   const dateStr = formatDate(date);
-
   return useQuery({
-    queryKey: ['boxDetalle', idBox, dateStr, token],
+    queryKey: ['boxDetalleV2', idBox, dateStr, token],
     queryFn: fetchBoxDetalle,
-    staleTime: 1000 * 60,
-    cacheTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
+    staleTime: 60_000,
     refetchInterval: 5000,
-    retry: 1,
   });
 }

@@ -1,4 +1,4 @@
-import { CalendarDaysIcon, BellIcon, UserCircleIcon } from "@heroicons/react/24/solid"
+import { BellIcon, UserCircleIcon } from "@heroicons/react/24/solid"
 import logo from '../assets/images/hospital-logo.png'
 import { useNavigate } from "react-router-dom";
 

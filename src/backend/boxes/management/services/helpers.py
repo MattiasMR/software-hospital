@@ -1,7 +1,9 @@
 # boxes/helpers.py
 from datetime import time, datetime
+from collections import defaultdict
 from django.utils import timezone
 from django.db.models import Prefetch
+
 from ...models import (
     Box,
     Consulta,
@@ -9,12 +11,11 @@ from ...models import (
     DisponibilidadBox,
 )
 
-HORAS_FRANJAS = range(8, 22)        # 08:00 – 22:00
-
+HORAS_FRANJAS = range(4, 22)  # 08:00 – 22:00
 
 def _estado_consulta_display(consulta, ini_dt, fin_dt):
     estado = consulta.estadoConsulta.estadoConsulta
-    now = timezone.localtime()  # aware en zona Santiago
+    now = timezone.localtime()
 
     if estado == EstadoConsulta.Estado.CANCELADA:
         return "Cancelada"
@@ -30,15 +31,8 @@ def _estado_consulta_display(consulta, ini_dt, fin_dt):
 
 def get_box_franjas(box, fecha):
     tz = timezone.get_current_timezone()
-    inicio_dia = timezone.make_aware(
-        datetime.combine(fecha, time.min),
-        tz
-    )
-    fin_dia = timezone.make_aware(
-        datetime.combine(fecha, time.max),
-        tz
-    )
-    # Filtramos por rango
+    inicio_dia = timezone.make_aware(datetime.combine(fecha, time.min), tz)
+    fin_dia = timezone.make_aware(datetime.combine(fecha, time.max), tz)
     consultas = (
         box.consultas
            .filter(
@@ -62,16 +56,12 @@ def get_box_franjas(box, fecha):
             })
         return franjas
 
-    tz = timezone.get_current_timezone()
-
     for h in HORAS_FRANJAS:
-        # Creamos datetime naïve y luego lo hacemos aware
         ini_naive = datetime.combine(fecha, time(h, 0))
         fin_naive = datetime.combine(fecha, time(h+1, 0))
         ini_dt = timezone.make_aware(ini_naive, tz)
         fin_dt = timezone.make_aware(fin_naive, tz)
 
-        # Buscamos consulta que se solape
         consulta = next(
             (
                 c for c in consultas
@@ -121,12 +111,12 @@ def get_boxes_with_kpis(target_date=None):
                Prefetch(
                    "consultas",
                    queryset=Consulta.objects.select_related("medico__especialidad", "estadoConsulta")
-               )
+               ),
+               "especialidades"
            )
     )
 
     now = timezone.localtime()
-    hora_actual = now.hour
 
     results = []
     for box in boxes:
@@ -137,19 +127,19 @@ def get_boxes_with_kpis(target_date=None):
             f["medico"] for f in franjas if f["medico"] is not None
         })
 
-        # ─── Estado actual del box ─────────────────────────
+        especialidades_box = [esp.nombreEspecialidad for esp in box.especialidades.all()]
+
+        # Estado actual del box
         if box.disponibilidadBox.disponibilidad == DisponibilidadBox.Estado.INHABILITADO:
             disponibilidad = "Inhabilitado"
             medico_actual  = None
         else:
-            # Miramos directamente en la base si hay alguna consulta solapándose con 'now'
             consultas_ahora = box.consultas.filter(
                 fechaHoraInicio__lte=now,
                 fechaHoraFin__gt=now,
             )
             if consultas_ahora.exists():
                 disponibilidad = "Ocupado"
-                # Tomamos el médico de la primera consulta activa
                 medico = consultas_ahora.first().medico
                 medico_actual = medico.nombreCompleto if medico else None
             else:
@@ -163,6 +153,61 @@ def get_boxes_with_kpis(target_date=None):
             "medicoAsignado": medico_actual,
             "porcentajeOcupacion": porcentaje,
             "medicosDelDia": medicos_del_dia,
+            "especialidades": especialidades_box,
         })
 
     return results
+
+def get_box_turnos(box, fecha):
+    """
+    Para un box y un día, devuelve para cada médico:
+    - su rango de jornada (desde Medico.jornada)
+    - cuántas horas de esa jornada realmente estuvo en consultas
+    - % de ocupación (horas trabajadas / total jornada)
+    - la lista de consultas (inicio, fin, estado)
+    """
+    tz = timezone.get_current_timezone()
+    inicio_dia = timezone.make_aware(datetime.combine(fecha, time.min), tz)
+    fin_dia    = timezone.make_aware(datetime.combine(fecha, time.max), tz)
+
+    consultas = (
+        box.consultas
+           .filter(fechaHoraInicio__gte=inicio_dia, fechaHoraInicio__lt=fin_dia)
+           .select_related("medico__especialidad", "medico__jornada", "estadoConsulta")
+    )
+
+    grupos = defaultdict(list)
+    for c in consultas:
+        grupos[c.medico].append(c)
+
+    turnos = []
+    for medico, cons in grupos.items():
+        jornada = medico.jornada
+        j_ini = timezone.make_aware(datetime.combine(fecha, jornada.jornadaInicio), tz)
+        j_fin = timezone.make_aware(datetime.combine(fecha, jornada.jornadaFin), tz)
+        jornada_secs = (j_fin - j_ini).total_seconds()
+
+        ocup_secs = 0
+        consultas_data = []
+        for c in cons:
+            start = max(c.fechaHoraInicio, j_ini)
+            end   = min(c.fechaHoraFin,    j_fin)
+            if end > start:
+                ocup_secs += (end - start).total_seconds()
+            consultas_data.append({
+                "inicio": start.strftime("%H:%M"),
+                "fin":    end.strftime("%H:%M"),
+                "estado": c.estadoConsulta.estadoConsulta,
+            })
+
+        porcentaje = int((ocup_secs / jornada_secs) * 100) if jornada_secs else 0
+        turnos.append({
+            "medico": medico.nombreCompleto,
+            "especialidad": medico.especialidad.nombreEspecialidad,
+            "rango": f"{jornada.jornadaInicio.strftime('%H:%M')}-{jornada.jornadaFin.strftime('%H:%M')}",
+            "horasOcupadas": round(ocup_secs/3600, 2),
+            "porcentajeOcupacion": porcentaje,
+            "consultas": consultas_data,
+        })
+
+    return turnos

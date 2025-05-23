@@ -122,9 +122,9 @@ export default function Reportes() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
 
                 {/* 1. Gráfico de barras */}
-                <WhiteCard className="flex flex-col items-center w-full h-full p-0"> 
+                <WhiteCard className="flex flex-col items-center w-full h-[60vh] p-0"> 
                 <h3 className="mb-2 font-semibold pt-4">Consultas por Franja Horaria</h3>
-                <div className="w-[calc(100%-2.5rem)] h-[calc(100%-2.5rem)] p-0">
+                <div className="w-[calc(100%-2.5rem)] h-[60vh] p-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
                       <XAxis dataKey="franja" tick={{ fontSize: 10 }} />
@@ -140,24 +140,13 @@ export default function Reportes() {
                 {/* 2. Panel central de KPIs */}
                 <div className="flex flex-col gap-4 w-full">
                   
-                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4 sm:mb-34 min-[px]:mb-60'>
                   <WhiteCard className="text-center p-6 ">
                     <p className="text-xl text-black font-bold">Médico líder</p>
                     <p className="mt-1 text-xl">{kpi?.medico_lider?.name||'—'}</p>
                     <p>{kpi?.medico_lider?.horas||0} horas</p>
                   </WhiteCard>
 
-                  <WhiteCard className="text-center p-2">
-                    <p className="text-xl text-black font-bold mb-2">Ranking de Médicos</p>
-                    <ol className="list-decimal list-inside space-y-1 text-l pr-10">
-                      {(kpi?.ranking_medicos ?? []).map(b => (
-                        <li key={b.id}>{b.id} – {b.horas} horas</li>
-                      ))}
-                    </ol>
-                  </WhiteCard>
-                </div>
-
-                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <WhiteCard className="text-center p-6">
                     <p className="text-xl text-black font-bold">Box líder</p>
                     <p className="mt-1 text-xl">
@@ -166,14 +155,6 @@ export default function Reportes() {
                     <p>{kpi?.box_mayor_uso?.horas || 0} horas</p>
                   </WhiteCard>
 
-                  <WhiteCard className="text-center p-6">
-                    <p className="text-xl text-black font-bold mb-2">Ranking de Boxes</p>
-                    <ol className="list-decimal list-inside space-y-1 text-l pr-10">
-                      {(kpi?.ranking_boxes ?? []).map(b => (
-                        <li key={b.id}>Box {b.id} – {b.horas} horas</li>
-                      ))}
-                    </ol>
-                  </WhiteCard>
                 </div>
 
                   <WhiteCard className="text-center p-6">
@@ -184,11 +165,13 @@ export default function Reportes() {
                     <p>{kpi?.especialidad_mas_demanda?.horas || 0} horas</p>
                   </WhiteCard>
 
+
+
                   
                 </div>
 
                 {/* 3. Gráfico circular */}
-                <WhiteCard className="flex flex-col items-center">
+                <WhiteCard className="flex flex-col items-center h-[60vh]">
                   <h3 className="mb-4 font-semibold">Consultas por Especialidad</h3>
                   <div className="w-full h-full">
                     <ResponsiveContainer width="100%" height="100%">

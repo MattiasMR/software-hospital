@@ -1,5 +1,3 @@
-// src/pages/Dashboard.jsx
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -54,7 +52,7 @@ export default function Dashboard() {
   useEffect(() => {
     const [year, month] = dateStr.split('-').map(Number);
 
-    for (let day = 18; day <= 24; day++) {
+    for (let day = 22; day <= 24; day++) {
       const ds = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       queryClient.prefetchQuery({
         queryKey: ['boxes', ds],

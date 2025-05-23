@@ -1,5 +1,3 @@
-# backend/boxes/admin.py
-
 from django.contrib import admin
 from .models import (
     DisponibilidadBox,
@@ -39,10 +37,19 @@ class PasilloAdmin(admin.ModelAdmin):
     list_display = ('id', 'nombrePasillo')
     search_fields = ('nombrePasillo',)
 
+class BoxEspecialidadInline(admin.TabularInline):
+    model = BoxEspecialidad
+    extra = 1
+
+class ConsultaInline(admin.TabularInline):
+    model = Consulta
+    extra = 1
+
 @admin.register(Box)
 class BoxAdmin(admin.ModelAdmin):
     list_display = ('id', 'pasillo', 'disponibilidadBox')
     list_filter = ('pasillo', 'disponibilidadBox')
+    inlines = [BoxEspecialidadInline, ConsultaInline]
 
 @admin.register(BoxEspecialidad)
 class BoxEspecialidadAdmin(admin.ModelAdmin):
@@ -69,3 +76,4 @@ class ConsultaAdmin(admin.ModelAdmin):
         'box__id',
         'medico__nombreCompleto',
     )
+    date_hierarchy = 'fechaHoraInicio'

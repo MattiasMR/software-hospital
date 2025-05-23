@@ -6,14 +6,16 @@ import {
   CalendarIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  Squares2X2Icon,
 } from "@heroicons/react/24/solid";
 
 const icons = [
-  { icon: HomeIcon, to: "/dashboard" },
-  { icon: MagnifyingGlassIcon },
+  { icon: HomeIcon, to: "/resumen" },
+  { icon: Squares2X2Icon, to: "/dashboard" },
+  { icon: ChartBarIcon, to: "/reportes" },
+  { icon: MagnifyingGlassIcon, to: "/medicos" },
   { icon: ExclamationTriangleIcon },
   { icon: CalendarIcon },
-  { icon: ChartBarIcon, to: "/reportes" },
   { icon: Cog6ToothIcon },
 ];
 
